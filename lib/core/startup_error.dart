@@ -1,0 +1,3 @@
+class FirebaseSetupRequired {
+  const FirebaseSetupRequired();
+}
