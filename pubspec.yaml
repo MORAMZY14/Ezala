@@ -1,7 +1,7 @@
 name: mmr_cabinets_app
 description: Ezla Project realtime cabinet, box, and approval management.
 publish_to: none
-version: 1.0.6+14
+version: 1.0.7+15
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
