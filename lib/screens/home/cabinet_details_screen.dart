@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../models/cabinet.dart';
 import '../../models/cabinet_box.dart';
+import '../../models/status_request.dart';
 import '../../services/cabinet_repository.dart';
+import '../../services/status_request_repository.dart';
 import '../../widgets/box_card.dart';
 
 enum _BoxFilter { all, pending, confirmed, internal, external }
@@ -20,6 +22,7 @@ class CabinetDetailsScreen extends StatefulWidget {
 
 class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
   final _repository = CabinetRepository();
+  final _statusRepository = StatusRequestRepository();
   final _searchController = TextEditingController();
   final _updating = <String>{};
 
@@ -54,17 +57,50 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
     BoxStatus newStatus,
   ) async {
     if (box.status == newStatus || _updating.contains(box.id)) return;
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          newStatus == BoxStatus.confirmed
+              ? Icons.check_circle_outline_rounded
+              : Icons.schedule_rounded,
+        ),
+        title: const Text('إرسال طلب تغيير الحالة'),
+        content: Text(
+          'هل تريد طلب تحويل بوكس ${box.boxNumber} إلى '
+          '${newStatus.label}؟ لن تتغير الحالة قبل موافقة المسؤول.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('إرسال الطلب'),
+          ),
+        ],
+      ),
+    );
+    if (shouldSubmit != true || !mounted) return;
+
     setState(() => _updating.add(box.id));
     try {
-      await _repository.updateStatus(
+      await _statusRepository.submitRequest(
         cabinet: widget.cabinet,
         box: box,
-        newStatus: newStatus,
+        targetStatus: newStatus,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال الطلب وينتظر موافقة المسؤول.'),
+        ),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحديث الحالة: $error')),
+        SnackBar(content: Text('تعذر إرسال الطلب: $error')),
       );
     } finally {
       if (mounted) setState(() => _updating.remove(box.id));
@@ -77,14 +113,14 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
       appBar: AppBar(
         title: Directionality(
           textDirection: TextDirection.ltr,
-          child: Text('Cabinet ${widget.cabinet.code}'),
+          child: Text('كابينة ${widget.cabinet.code}'),
         ),
       ),
       body: StreamBuilder<List<CabinetBox>>(
         stream: _repository.watchBoxes(widget.cabinet.id),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('تعذر تحميل الصناديق: ${snapshot.error}'));
+            return Center(child: Text('تعذر تحميل البوكسات: ${snapshot.error}'));
           }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -96,10 +132,21 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
               boxes.where((box) => box.status == BoxStatus.confirmed).length;
           final pending = boxes.length - confirmed;
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: CustomScrollView(
+          return StreamBuilder<List<StatusRequest>>(
+            stream: _statusRepository.watchRequestsForCabinet(
+              widget.cabinet.id,
+            ),
+            builder: (context, requestSnapshot) {
+              final pendingByBox = <String, StatusRequest>{
+                for (final request
+                    in requestSnapshot.data ?? const <StatusRequest>[])
+                  if (request.isPending) request.boxId: request,
+              };
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 920),
+                  child: CustomScrollView(
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
@@ -120,7 +167,7 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                                 setState(() => _query = value),
                             textDirection: TextDirection.ltr,
                             decoration: InputDecoration(
-                              hintText: 'ابحث برقم الصندوق...',
+                              hintText: 'ابحث برقم البوكس...',
                               prefixIcon: const Icon(Icons.search_rounded),
                               suffixIcon: _query.isEmpty
                                   ? null
@@ -184,7 +231,7 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                     const SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
-                        child: Text('لا توجد صناديق في هذه الخزانة.'),
+                        child: Text('لا توجد بوكسات في هذه الكابينة.'),
                       ),
                     )
                   else if (visible.isEmpty)
@@ -207,6 +254,7 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                             key: ValueKey(box.id),
                             box: box,
                             updating: _updating.contains(box.id),
+                            pendingRequest: pendingByBox[box.id],
                             onStatusChanged: (status) =>
                                 _changeStatus(box, status),
                           );
@@ -214,8 +262,10 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                       ),
                     ),
                 ],
-              ),
-            ),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -268,7 +318,7 @@ class _CabinetHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'الخزانة',
+                      'الكابينة',
                       style: TextStyle(color: Color(0xFFC8DDE1)),
                     ),
                     Text(
@@ -307,7 +357,7 @@ class _CabinetHeader extends StatelessWidget {
           Row(
             children: [
               Text(
-                '$total صندوق',
+                '$total بوكس',
                 style: const TextStyle(color: Colors.white),
               ),
               const Spacer(),

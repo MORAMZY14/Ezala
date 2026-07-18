@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../models/cabinet_box.dart';
+import '../models/status_request.dart';
 import 'status_pill.dart';
 
 class BoxCard extends StatelessWidget {
@@ -9,11 +10,13 @@ class BoxCard extends StatelessWidget {
     super.key,
     required this.box,
     required this.updating,
+    required this.pendingRequest,
     required this.onStatusChanged,
   });
 
   final CabinetBox box;
   final bool updating;
+  final StatusRequest? pendingRequest;
   final ValueChanged<BoxStatus> onStatusChanged;
 
   @override
@@ -47,7 +50,7 @@ class BoxCard extends StatelessWidget {
                       Directionality(
                         textDirection: TextDirection.ltr,
                         child: Text(
-                          box.displayName,
+                          'بوكس ${box.boxNumber}',
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
@@ -79,7 +82,7 @@ class BoxCard extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.pendingSoft,
+                  color: AppColors.pending.withValues(alpha: .12),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: Row(
@@ -95,16 +98,45 @@ class BoxCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (pendingRequest != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'طلب ${pendingRequest!.targetStatus.label} بواسطة '
+                        '${pendingRequest!.requestedByName}، وينتظر موافقة '
+                        'المسؤول.',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             IgnorePointer(
-              ignoring: updating,
+              ignoring: updating || pendingRequest != null,
               child: Opacity(
-                opacity: updating ? .55 : 1,
+                opacity: updating || pendingRequest != null ? .55 : 1,
                 child: Row(
                   children: [
                     Expanded(
                       child: _StatusChoice(
-                        label: 'قيد الانتظار',
+                        label: 'طلب تعليق',
                         icon: Icons.schedule_rounded,
                         selected: box.status == BoxStatus.pending,
                         selectedColor: AppColors.pending,
@@ -115,7 +147,7 @@ class BoxCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _StatusChoice(
-                        label: 'مؤكد',
+                        label: 'طلب تأكيد',
                         icon: Icons.check_circle_rounded,
                         selected: box.status == BoxStatus.confirmed,
                         selectedColor: AppColors.success,
@@ -158,7 +190,9 @@ class _StatusChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? selectedBackground : const Color(0xFFF6F8F9),
+      color: selected
+          ? selectedBackground
+          : Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -168,7 +202,9 @@ class _StatusChoice extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? selectedColor : AppColors.line,
+              color: selected
+                  ? selectedColor
+                  : Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
           child: Row(
@@ -185,7 +221,9 @@ class _StatusChoice extends StatelessWidget {
                   label,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? selectedColor : AppColors.ink,
+                    color: selected
+                        ? selectedColor
+                        : Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),

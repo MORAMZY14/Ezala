@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import 'theme_toggle_button.dart';
 
 class AuthShell extends StatelessWidget {
   const AuthShell({
@@ -20,6 +21,15 @@ class AuthShell extends StatelessWidget {
       body: Stack(
         children: [
           const Positioned.fill(child: _AuthBackground()),
+          const SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: ThemeToggleButton(onDarkBackground: true),
+              ),
+            ),
+          ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -54,7 +64,7 @@ class AuthShell extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: const [
                             BoxShadow(
@@ -157,7 +167,7 @@ class _BrandMark extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'MMR',
+              'Ezla Project',
               textDirection: TextDirection.ltr,
               style: TextStyle(
                 color: Colors.white,
@@ -167,7 +177,7 @@ class _BrandMark extends StatelessWidget {
               ),
             ),
             Text(
-              'إدارة الخزائن',
+              'إدارة الكبائن والبوكسات',
               style: TextStyle(color: Color(0xFFD5E7EA)),
             ),
           ],

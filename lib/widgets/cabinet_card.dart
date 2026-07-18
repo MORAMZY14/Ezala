@@ -63,14 +63,15 @@ class CabinetCard extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 4),
-              Text('${cabinet.boxCount} صندوق'),
+              Text('${cabinet.boxCount} بوكس'),
               const SizedBox(height: 15),
               ClipRRect(
                 borderRadius: BorderRadius.circular(99),
                 child: LinearProgressIndicator(
                   value: cabinet.progress,
                   minHeight: 8,
-                  backgroundColor: const Color(0xFFEAF0F2),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation(
                     complete ? AppColors.success : AppColors.teal,
                   ),

@@ -1,18 +1,23 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../models/app_user_profile.dart';
 import '../../models/cabinet.dart';
 import '../../services/auth_service.dart';
 import '../../services/cabinet_repository.dart';
+import '../../services/status_request_repository.dart';
 import '../../widgets/cabinet_card.dart';
+import '../../widgets/theme_toggle_button.dart';
+import '../activity/activity_screen.dart';
 import '../import/import_screen.dart';
 import 'cabinet_details_screen.dart';
 
 enum _CabinetFilter { all, pending, complete }
 
 class CabinetsScreen extends StatefulWidget {
-  const CabinetsScreen({super.key});
+  const CabinetsScreen({super.key, required this.profile});
+
+  final AppUserProfile profile;
 
   @override
   State<CabinetsScreen> createState() => _CabinetsScreenState();
@@ -20,6 +25,7 @@ class CabinetsScreen extends StatefulWidget {
 
 class _CabinetsScreenState extends State<CabinetsScreen> {
   final _repository = CabinetRepository();
+  final _statusRepository = StatusRequestRepository();
   final _auth = AuthService();
   final _searchController = TextEditingController();
 
@@ -33,8 +39,17 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
   }
 
   Future<void> _openImport() async {
+    if (!widget.profile.isAdmin) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const ImportScreen()),
+    );
+  }
+
+  Future<void> _openActivity() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ActivityScreen(isAdmin: widget.profile.isAdmin),
+      ),
     );
   }
 
@@ -75,10 +90,7 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
-        : user?.email?.split('@').first ?? 'المستخدم';
+    final userName = widget.profile.name;
 
     return Scaffold(
       appBar: AppBar(
@@ -99,14 +111,16 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
               ),
             ),
             const SizedBox(width: 11),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('MMR Cabinets'),
+                const Text('Ezla Project'),
                 Text(
-                  'لوحة متابعة الاستلام',
+                  widget.profile.isAdmin
+                      ? 'لوحة المسؤول'
+                      : 'لوحة متابعة الاستلام',
                   style: TextStyle(
-                    color: Color(0xFF6A818C),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -116,28 +130,37 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
           ],
         ),
         actions: [
-          IconButton.filledTonal(
-            tooltip: 'استيراد Excel',
-            onPressed: _openImport,
-            icon: const Icon(Icons.upload_file_rounded),
+          const ThemeToggleButton(),
+          _ActivityButton(
+            stream: _statusRepository.watchPendingRequestCount(),
+            onPressed: _openActivity,
           ),
-          const SizedBox(width: 6),
           PopupMenuButton<String>(
             tooltip: 'الحساب',
             onSelected: (value) {
+              if (value == 'activity') _openActivity();
               if (value == 'import') _openImport();
               if (value == 'logout') _signOut();
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'import',
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'activity',
                 child: ListTile(
-                  leading: Icon(Icons.upload_file_rounded),
-                  title: Text('استيراد Excel'),
+                  leading: Icon(Icons.bolt_rounded),
+                  title: Text('النشاط المباشر'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              PopupMenuItem(
+              if (widget.profile.isAdmin)
+                const PopupMenuItem(
+                  value: 'import',
+                  child: ListTile(
+                    leading: Icon(Icons.upload_file_rounded),
+                    title: Text('استيراد Excel'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
                   leading: Icon(Icons.logout_rounded),
@@ -191,7 +214,9 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 5),
-                  const Text('اختر خزانة لمراجعة الصناديق وتحديث حالتها.'),
+                  const Text(
+                    'اختر كابينة لمراجعة البوكسات وإرسال طلبات تحديث الحالة.',
+                  ),
                   const SizedBox(height: 22),
                   _SummaryPanel(
                     cabinetCount: cabinets.length,
@@ -251,7 +276,9 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
                   ),
                   const SizedBox(height: 18),
                   if (cabinets.isEmpty)
-                    _EmptyCabinets(onImport: _openImport)
+                    _EmptyCabinets(
+                      onImport: widget.profile.isAdmin ? _openImport : null,
+                    )
                   else if (visible.isEmpty)
                     const _NoSearchResults()
                   else
@@ -296,6 +323,61 @@ class _CabinetsScreenState extends State<CabinetsScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _ActivityButton extends StatelessWidget {
+  const _ActivityButton({
+    required this.stream,
+    required this.onPressed,
+  });
+
+  final Stream<int> stream;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: 'النشاط المباشر',
+              onPressed: onPressed,
+              icon: const Icon(Icons.bolt_rounded),
+            ),
+            if (count > 0)
+              PositionedDirectional(
+                top: 2,
+                end: 1,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    count > 99 ? '99+' : '$count',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -371,9 +453,9 @@ class _SummaryPanel extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              _SummaryValue(label: 'الخزائن', value: cabinetCount),
+              _SummaryValue(label: 'الكبائن', value: cabinetCount),
               _SummaryDivider(),
-              _SummaryValue(label: 'الصناديق', value: totalBoxes),
+              _SummaryValue(label: 'البوكسات', value: totalBoxes),
               _SummaryDivider(),
               _SummaryValue(label: 'مؤكد', value: confirmed),
               _SummaryDivider(),
@@ -455,7 +537,7 @@ class _FilterChip extends StatelessWidget {
 class _EmptyCabinets extends StatelessWidget {
   const _EmptyCabinets({required this.onImport});
 
-  final VoidCallback onImport;
+  final VoidCallback? onImport;
 
   @override
   Widget build(BuildContext context) {
@@ -471,17 +553,23 @@ class _EmptyCabinets extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'لا توجد خزائن بعد',
+              'لا توجد كبائن بعد',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 6),
-            const Text('استورد ملف Excel المرفق لبدء العمل.'),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onImport,
-              icon: const Icon(Icons.upload_file_rounded),
-              label: const Text('استيراد البيانات'),
+            Text(
+              onImport == null
+                  ? 'اطلب من المسؤول استيراد ملف Excel لبدء العمل.'
+                  : 'استورد ملف Excel المرفق لبدء العمل.',
             ),
+            if (onImport != null) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('استيراد البيانات'),
+              ),
+            ],
           ],
         ),
       ),
@@ -496,7 +584,7 @@ class _NoSearchResults extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 40),
-      child: Center(child: Text('لا توجد خزائن تطابق البحث.')),
+      child: Center(child: Text('لا توجد كبائن تطابق البحث.')),
     );
   }
 }
@@ -520,7 +608,7 @@ class _ErrorState extends StatelessWidget {
               size: 48,
             ),
             const SizedBox(height: 12),
-            const Text('تعذر تحميل الخزائن.'),
+            const Text('تعذر تحميل الكبائن.'),
             const SizedBox(height: 8),
             SelectableText(
               error,

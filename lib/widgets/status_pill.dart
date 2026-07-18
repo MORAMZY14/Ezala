@@ -13,8 +13,12 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final confirmed = status == BoxStatus.confirmed;
     final color = confirmed ? AppColors.success : AppColors.pending;
-    final background =
-        confirmed ? AppColors.successSoft : AppColors.pendingSoft;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final background = isDark
+        ? color.withValues(alpha: .18)
+        : confirmed
+            ? AppColors.successSoft
+            : AppColors.pendingSoft;
 
     return Container(
       padding: EdgeInsets.symmetric(

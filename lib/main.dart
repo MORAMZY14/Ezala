@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'core/startup_error.dart';
+import 'core/theme_controller.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.instance.load();
 
   Object? startupError;
   final options = DefaultFirebaseOptions.currentPlatform;
@@ -20,5 +22,5 @@ Future<void> main() async {
     }
   }
 
-  runApp(MmrCabinetsApp(startupError: startupError));
+  runApp(EzlaProjectApp(startupError: startupError));
 }

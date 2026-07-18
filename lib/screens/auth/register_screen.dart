@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthShell(
-      title: 'ابدأ إدارة الخزائن',
+      title: 'ابدأ إدارة الكبائن',
       subtitle: 'أنشئ حسابك لتحديث حالات الاستلام مع فريقك.',
       child: Form(
         key: _formKey,

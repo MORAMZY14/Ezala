@@ -73,14 +73,14 @@ class _ImportScreenState extends State<ImportScreen> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 16),
-                _PreviewRow(label: 'الخزائن', value: preview.cabinetCount),
-                _PreviewRow(label: 'الصناديق', value: preview.boxCount),
+                _PreviewRow(label: 'الكبائن', value: preview.cabinetCount),
+                _PreviewRow(label: 'البوكسات', value: preview.boxCount),
                 _PreviewRow(label: 'مؤكد', value: preview.confirmedCount),
                 _PreviewRow(label: 'قيد الانتظار', value: preview.pendingCount),
                 const SizedBox(height: 14),
                 const Text(
-                  'سيتم تحديث البيانات المطابقة وحذف الصناديق القديمة غير '
-                  'الموجودة في الملف داخل الخزائن المستوردة.',
+                  'سيتم تحديث البيانات المطابقة وحذف البوكسات القديمة غير '
+                  'الموجودة في الملف داخل الكبائن المستوردة.',
                   style: TextStyle(fontSize: 12),
                 ),
               ],
@@ -137,15 +137,15 @@ class _ImportScreenState extends State<ImportScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'تم رفع ${result.cabinetCount} خزانة و'
-                '${result.boxCount} صندوق.',
+                'تم رفع ${result.cabinetCount} كابينة و'
+                '${result.boxCount} بوكس.',
               ),
               if (result.storageWarning != null) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.pendingSoft,
+                    color: AppColors.pending.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -234,7 +234,7 @@ class _ImportScreenState extends State<ImportScreen> {
                             SizedBox(height: 5),
                             Text(
                               'يحفظ التطبيق نسخة الملف في Storage ثم يحول '
-                              'الخزائن والصناديق إلى بيانات حية في Firestore.',
+                              'الكبائن والبوكسات إلى بيانات حية في Firestore.',
                               style: TextStyle(
                                 color: Color(0xFFD2E7EA),
                                 height: 1.5,
@@ -252,7 +252,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   iconColor: AppColors.teal,
                   title: 'استيراد البيانات المرفقة',
                   subtitle:
-                      '17 خزانة • 1,046 صندوق • جاهزة من الملف الذي أرسلته',
+                      '17 كابينة • 1,046 بوكس • جاهزة من الملف الذي أرسلته',
                   buttonLabel: 'تحميل بيانات البداية',
                   onPressed: _busy ? null : _importBundled,
                 ),
@@ -262,7 +262,7 @@ class _ImportScreenState extends State<ImportScreen> {
                   iconColor: AppColors.pending,
                   title: 'اختيار ملف Excel جديد',
                   subtitle:
-                      'كل Sheet يمثل خزانة، والأعمدة الثلاثة هي رقم الصندوق '
+                      'كل Sheet يمثل كابينة، والأعمدة الثلاثة هي رقم البوكس '
                       'والموقع وحالة الاستلام.',
                   buttonLabel: 'اختيار ملف .xlsx',
                   onPressed: _busy ? null : _pickExcel,
@@ -271,7 +271,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.pendingSoft,
+                    color: AppColors.pending.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: const Row(

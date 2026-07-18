@@ -236,6 +236,11 @@ class ExcelImportService {
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw StateError('Authentication required');
+    final userSnapshot =
+        await _firestore.collection('users').doc(user.uid).get();
+    if (userSnapshot.data()?['role'] != 'admin') {
+      throw StateError('استيراد البيانات متاح للمسؤولين فقط.');
+    }
     _validate(preview);
 
     final importRef = _firestore.collection('imports').doc();
@@ -329,7 +334,7 @@ class ExcelImportService {
         final fraction = end / writes.length;
         onProgress?.call(
           0.1 + (fraction * 0.86),
-          'جاري رفع الصناديق... ${(fraction * 100).round()}٪',
+          'جاري رفع البوكسات... ${(fraction * 100).round()}٪',
         );
       }
 
@@ -372,7 +377,7 @@ class ExcelImportService {
   static void _validate(ImportPreview preview) {
     if (preview.cabinets.isEmpty || preview.boxCount == 0) {
       throw const FormatException(
-        'لم يتم العثور على خزائن وصناديق صالحة في الملف.',
+        'لم يتم العثور على كبائن وبوكسات صالحة في الملف.',
       );
     }
     final duplicateCodes = <String>{};
@@ -382,7 +387,7 @@ class ExcelImportService {
     }
     if (duplicateCodes.isNotEmpty) {
       throw FormatException(
-        'أسماء خزائن مكررة: ${duplicateCodes.join(', ')}',
+        'أسماء كبائن مكررة: ${duplicateCodes.join(', ')}',
       );
     }
   }
