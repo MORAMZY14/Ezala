@@ -6,31 +6,108 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid))
+          .data.role == 'admin';
+    }
+
+    function currentUserName() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid))
+        .data.name;
+    }
+
+    function validBoxStatus(value) {
+      return value == 'pending' || value == 'confirmed';
+    }
+
+    function validNewStatusRequest() {
+      return signedIn()
+        && request.resource.data.requestedByUid == request.auth.uid
+        && request.resource.data.requestedByName == currentUserName()
+        && request.resource.data.state == 'pending'
+        && validBoxStatus(request.resource.data.previousStatus)
+        && validBoxStatus(request.resource.data.targetStatus)
+        && request.resource.data.previousStatus
+          != request.resource.data.targetStatus;
+    }
+
     match /users/{userId} {
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.role == 'operator';
+
       allow read: if signedIn();
-      allow update: if signedIn()
-        && request.auth.uid == userId
-        && request.resource.data.role == resource.data.role;
+
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role);
+
       allow delete: if false;
     }
 
     match /cabinets/{cabinetId} {
-      allow read, create, update: if signedIn();
-      allow delete: if false;
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
 
       match /boxes/{boxId} {
-        allow read, create, update, delete: if signedIn();
+        allow read: if signedIn();
+        allow create, update, delete: if isAdmin();
       }
     }
 
-    match /imports/{importId} {
+    match /statusRequests/{requestId} {
+      allow read: if signedIn();
+
+      allow create: if validNewStatusRequest();
+
+      allow update: if (
+          resource.data.state != 'pending' && validNewStatusRequest()
+        ) || (
+          isAdmin()
+          && resource.data.state == 'pending'
+          && (request.resource.data.state == 'approved'
+            || request.resource.data.state == 'rejected')
+          && request.resource.data.reviewedByUid == request.auth.uid
+          && request.resource.data.reviewedByName == currentUserName()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'state',
+            'reviewedByUid',
+            'reviewedByName',
+            'reviewedAt'
+          ])
+        );
+
+      allow delete: if false;
+    }
+
+    match /statusActivities/{activityId} {
+      allow read: if signedIn();
+
       allow create: if signedIn()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorName == currentUserName()
+        && validBoxStatus(request.resource.data.previousStatus)
+        && validBoxStatus(request.resource.data.targetStatus)
+        && (
+          (request.resource.data.eventType == 'request_created'
+            && request.resource.data.requestedByUid == request.auth.uid)
+          ||
+          (isAdmin()
+            && (request.resource.data.eventType == 'request_approved'
+              || request.resource.data.eventType == 'request_rejected'))
+        );
+
+      allow update, delete: if false;
+    }
+
+    match /imports/{importId} {
+      allow create: if isAdmin()
         && request.resource.data.createdBy == request.auth.uid;
       allow read: if signedIn();
-      allow update: if signedIn()
+      allow update: if isAdmin()
         && resource.data.createdBy == request.auth.uid
         && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if false;

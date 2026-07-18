@@ -1,1 +1,9 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"storage":{"rules":"storage.rules"},"flutter":{"platforms":{"android":{"default":{"projectId":"el-ezala","appId":"1:412217920336:android:cf920651d987ff0a4a7a55","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"el-ezala","configurations":{"android":"1:412217920336:android:cf920651d987ff0a4a7a55","ios":"1:412217920336:ios:b07c2e9d4e6d4c564a7a55","web":"1:412217920336:web:864d5f25ae304cb94a7a55"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}
