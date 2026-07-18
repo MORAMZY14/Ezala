@@ -6,7 +6,7 @@ import 'core/startup_error.dart';
 import 'core/theme_controller.dart';
 import 'firebase_options.dart';
 
-const String appVersion = 'V1.0.7';
+const String appVersion = 'V1.0.8';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
