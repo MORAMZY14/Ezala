@@ -94,8 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthShell(
-      title: 'مرحبًا بعودتك',
-      subtitle: 'تابع حالة كل خزانة وصندوق لحظة بلحظة.',
+      title: 'Welcome Back',
+      subtitle: 'متابعة مشروع FTTH الازالة.',
       child: Form(
         key: _formKey,
         child: Column(
