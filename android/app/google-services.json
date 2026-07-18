@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "412217920336",
+    "project_id": "el-ezala",
+    "storage_bucket": "el-ezala.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:412217920336:android:cf920651d987ff0a4a7a55",
+        "android_client_info": {
+          "package_name": "com.mmr.mmr_cabinets_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJDFT2BxdP-1JBml2fz3d78ctSAezoNik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
