@@ -10,17 +10,25 @@ class BoxCard extends StatelessWidget {
     super.key,
     required this.box,
     required this.updating,
-    required this.pendingRequest,
+    required this.pendingStatusRequest,
+    required this.pendingLocationRequest,
     required this.onStatusChanged,
+    required this.onLocationChanged,
   });
 
   final CabinetBox box;
   final bool updating;
-  final StatusRequest? pendingRequest;
+  final StatusRequest? pendingStatusRequest;
+  final StatusRequest? pendingLocationRequest;
   final ValueChanged<BoxStatus> onStatusChanged;
+  final ValueChanged<BoxLocation> onLocationChanged;
 
   @override
   Widget build(BuildContext context) {
+    final targetLocation = box.location == BoxLocation.internal
+        ? BoxLocation.external
+        : BoxLocation.internal;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -98,40 +106,19 @@ class BoxCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (pendingRequest != null) ...[
+            if (pendingStatusRequest != null) ...[
               const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'طلب ${pendingRequest!.targetStatus.label} بواسطة '
-                        '${pendingRequest!.requestedByName}، وينتظر موافقة '
-                        'المسؤول.',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _PendingRequestBanner(request: pendingStatusRequest!),
+            ],
+            if (pendingLocationRequest != null) ...[
+              const SizedBox(height: 10),
+              _PendingRequestBanner(request: pendingLocationRequest!),
             ],
             const SizedBox(height: 16),
             IgnorePointer(
-              ignoring: updating || pendingRequest != null,
+              ignoring: updating || pendingStatusRequest != null,
               child: Opacity(
-                opacity: updating || pendingRequest != null ? .55 : 1,
+                opacity: updating || pendingStatusRequest != null ? .55 : 1,
                 child: Row(
                   children: [
                     Expanded(
@@ -159,12 +146,63 @@ class BoxCard extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            IgnorePointer(
+              ignoring: updating || pendingLocationRequest != null,
+              child: Opacity(
+                opacity: updating || pendingLocationRequest != null ? .55 : 1,
+                child: OutlinedButton.icon(
+                  onPressed: () => onLocationChanged(targetLocation),
+                  icon: Icon(
+                    targetLocation == BoxLocation.external
+                        ? Icons.logout_rounded
+                        : Icons.login_rounded,
+                  ),
+                  label: Text('طلب تحويل إلى ${targetLocation.label}'),
+                ),
+              ),
+            ),
             if (updating) ...[
               const SizedBox(height: 12),
               const LinearProgressIndicator(minHeight: 2),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PendingRequestBanner extends StatelessWidget {
+  const _PendingRequestBanner({required this.request});
+
+  final StatusRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.admin_panel_settings_outlined,
+            color: Theme.of(context).colorScheme.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${request.actionSummary} بواسطة ${request.requestedByName}، '
+              'وينتظر موافقة المسؤول.',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

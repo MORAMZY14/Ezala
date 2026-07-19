@@ -52,11 +52,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
         title: Text(approve ? 'اعتماد الطلب' : 'رفض الطلب'),
         content: Text(
           approve
-              ? 'سيتم تحويل ${request.boxLabel} في كابينة '
-                  '${request.cabinetCode} إلى ${request.targetStatus.label}. '
-                  'هل تريد المتابعة؟'
-              : 'هل تريد رفض طلب ${request.requestedByName} لتغيير '
-                  '${request.boxLabel} إلى ${request.targetStatus.label}؟',
+              ? 'سيتم تنفيذ طلب ${request.actionSummary} في كابينة '
+                  '${request.cabinetCode}. هل تريد المتابعة؟'
+              : 'هل تريد رفض طلب ${request.requestedByName}: '
+                  '${request.actionSummary}؟',
         ),
         actions: [
           TextButton(
@@ -86,7 +85,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            approve ? 'تم اعتماد الطلب وتحديث البوكس.' : 'تم رفض الطلب.',
+            approve ? 'تم اعتماد الطلب وتنفيذه.' : 'تم رفض الطلب.',
           ),
         ),
       );
@@ -350,6 +349,11 @@ class _ApprovalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestIcon = switch (request.kind) {
+      StatusRequestKind.addBox => Icons.add_box_rounded,
+      StatusRequestKind.locationChange => Icons.swap_horiz_rounded,
+      StatusRequestKind.statusChange => Icons.pending_actions_rounded,
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -365,8 +369,8 @@ class _ApprovalCard extends StatelessWidget {
                     color: AppColors.pending.withValues(alpha: .13),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
-                    Icons.pending_actions_rounded,
+                  child: Icon(
+                    requestIcon,
                     color: AppColors.pending,
                   ),
                 ),
@@ -382,9 +386,8 @@ class _ApprovalCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '${request.requestedByName} طلب التحويل من '
-                        '${request.previousStatus.label} إلى '
-                        '${request.targetStatus.label}',
+                        '${request.requestedByName} طلب '
+                        '${request.actionSummary}',
                       ),
                     ],
                   ),
@@ -457,15 +460,14 @@ class _ActivityCard extends StatelessWidget {
 
     final description = switch (activity.type) {
       StatusActivityType.requestCreated =>
-        '${activity.actorName} طلب تحويل ${activity.boxLabel} في كابينة '
-            '${activity.cabinetCode} إلى ${activity.targetStatus.label}.',
+        '${activity.actorName} طلب ${activity.actionSummary} في كابينة '
+            '${activity.cabinetCode}.',
       StatusActivityType.requestApproved =>
         '${activity.actorName} وافق على طلب ${activity.requestedByName}، '
-            'وتم تحويل ${activity.boxLabel} إلى '
-            '${activity.targetStatus.label}.',
+            'وتم تنفيذ ${activity.actionSummary}.',
       StatusActivityType.requestRejected =>
-        '${activity.actorName} رفض طلب ${activity.requestedByName} لتحويل '
-            '${activity.boxLabel} إلى ${activity.targetStatus.label}.',
+        '${activity.actorName} رفض طلب ${activity.requestedByName}: '
+            '${activity.actionSummary}.',
     };
 
     return Card(

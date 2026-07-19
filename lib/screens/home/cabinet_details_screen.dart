@@ -28,6 +28,7 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
 
   String _query = '';
   _BoxFilter _filter = _BoxFilter.all;
+  bool _addingBox = false;
 
   @override
   void dispose() {
@@ -107,6 +108,97 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
     }
   }
 
+  Future<void> _changeLocation(
+    CabinetBox box,
+    BoxLocation newLocation,
+  ) async {
+    if (box.location == newLocation || _updating.contains(box.id)) return;
+    final shouldSubmit = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          newLocation == BoxLocation.external
+              ? Icons.logout_rounded
+              : Icons.login_rounded,
+        ),
+        title: const Text('إرسال طلب تغيير النوع'),
+        content: Text(
+          'هل تريد طلب تحويل بوكس ${box.boxNumber} من '
+          '${box.location.label} إلى ${newLocation.label}؟ لن يتغير النوع '
+          'قبل موافقة المسؤول.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('إرسال الطلب'),
+          ),
+        ],
+      ),
+    );
+    if (shouldSubmit != true || !mounted) return;
+
+    setState(() => _updating.add(box.id));
+    try {
+      await _statusRepository.submitLocationRequest(
+        cabinet: widget.cabinet,
+        box: box,
+        targetLocation: newLocation,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال طلب التحويل وينتظر موافقة المسؤول.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إرسال الطلب: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _updating.remove(box.id));
+    }
+  }
+
+  Future<void> _addBox() async {
+    if (_addingBox) return;
+    final draft = await showDialog<_NewBoxDraft>(
+      context: context,
+      builder: (_) => const _AddBoxDialog(),
+    );
+    if (draft == null || !mounted) return;
+
+    setState(() => _addingBox = true);
+    try {
+      await _statusRepository.submitAddBoxRequest(
+        cabinet: widget.cabinet,
+        boxNumber: draft.boxNumber,
+        displayName: draft.displayName,
+        location: draft.location,
+        note: draft.note,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم إرسال طلب إضافة البوكس وينتظر موافقة المسؤول.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إرسال طلب الإضافة: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _addingBox = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,6 +207,17 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
           textDirection: TextDirection.ltr,
           child: Text('كابينة ${widget.cabinet.code}'),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addingBox ? null : _addBox,
+        icon: _addingBox
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.add_box_rounded),
+        label: const Text('إضافة بوكس'),
       ),
       body: StreamBuilder<List<CabinetBox>>(
         stream: _repository.watchBoxes(widget.cabinet.id),
@@ -137,11 +240,21 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
               widget.cabinet.id,
             ),
             builder: (context, requestSnapshot) {
-              final pendingByBox = <String, StatusRequest>{
-                for (final request
-                    in requestSnapshot.data ?? const <StatusRequest>[])
-                  if (request.isPending) request.boxId: request,
+              final requests =
+                  requestSnapshot.data ?? const <StatusRequest>[];
+              final pendingStatusByBox = <String, StatusRequest>{
+                for (final request in requests)
+                  if (request.isPending && request.isStatusChange)
+                    request.boxId: request,
               };
+              final pendingLocationByBox = <String, StatusRequest>{
+                for (final request in requests)
+                  if (request.isPending && request.isLocationChange)
+                    request.boxId: request,
+              };
+              final pendingAdditions = requests
+                  .where((request) => request.isPending && request.isAddBox)
+                  .length;
 
               return Center(
                 child: ConstrainedBox(
@@ -160,6 +273,10 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                             confirmed: confirmed,
                             pending: pending,
                           ),
+                          if (pendingAdditions > 0) ...[
+                            const SizedBox(height: 12),
+                            _PendingAdditionsBanner(count: pendingAdditions),
+                          ],
                           const SizedBox(height: 18),
                           TextField(
                             controller: _searchController,
@@ -243,7 +360,7 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
                       sliver: SliverList.separated(
                         itemCount: visible.length,
                         separatorBuilder: (_, __) =>
@@ -254,9 +371,14 @@ class _CabinetDetailsScreenState extends State<CabinetDetailsScreen> {
                             key: ValueKey(box.id),
                             box: box,
                             updating: _updating.contains(box.id),
-                            pendingRequest: pendingByBox[box.id],
+                            pendingStatusRequest:
+                                pendingStatusByBox[box.id],
+                            pendingLocationRequest:
+                                pendingLocationByBox[box.id],
                             onStatusChanged: (status) =>
                                 _changeStatus(box, status),
+                            onLocationChanged: (location) =>
+                                _changeLocation(box, location),
                           );
                         },
                       ),
@@ -405,6 +527,180 @@ class _BoxFilterChip extends StatelessWidget {
         onSelected: (_) => onTap(),
         showCheckmark: false,
       ),
+    );
+  }
+}
+
+class _PendingAdditionsBanner extends StatelessWidget {
+  const _PendingAdditionsBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.pending_actions_rounded,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              '$count طلب إضافة بوكس ينتظر موافقة المسؤول.',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewBoxDraft {
+  const _NewBoxDraft({
+    required this.boxNumber,
+    required this.displayName,
+    required this.location,
+    required this.note,
+  });
+
+  final String boxNumber;
+  final String displayName;
+  final BoxLocation location;
+  final String note;
+}
+
+class _AddBoxDialog extends StatefulWidget {
+  const _AddBoxDialog();
+
+  @override
+  State<_AddBoxDialog> createState() => _AddBoxDialogState();
+}
+
+class _AddBoxDialogState extends State<_AddBoxDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _boxNumberController = TextEditingController();
+  final _displayNameController = TextEditingController();
+  final _noteController = TextEditingController();
+  BoxLocation _location = BoxLocation.internal;
+
+  @override
+  void dispose() {
+    _boxNumberController.dispose();
+    _displayNameController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) return;
+    Navigator.pop(
+      context,
+      _NewBoxDraft(
+        boxNumber: _boxNumberController.text.trim(),
+        displayName: _displayNameController.text.trim(),
+        location: _location,
+        note: _noteController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.add_box_rounded),
+      title: const Text('طلب إضافة بوكس'),
+      content: SizedBox(
+        width: 430,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'لن يظهر البوكس داخل الكابينة إلا بعد موافقة المسؤول.',
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _boxNumberController,
+                  autofocus: true,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(
+                    labelText: 'رقم البوكس *',
+                    prefixIcon: Icon(Icons.numbers_rounded),
+                  ),
+                  validator: (value) => value?.trim().isEmpty == true
+                      ? 'أدخل رقم البوكس.'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _displayNameController,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم البوكس (اختياري)',
+                    hintText: 'BOX 12',
+                    prefixIcon: Icon(Icons.inventory_2_outlined),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'نوع البوكس',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                SegmentedButton<BoxLocation>(
+                  segments: const [
+                    ButtonSegment(
+                      value: BoxLocation.internal,
+                      label: Text('داخلي'),
+                      icon: Icon(Icons.login_rounded),
+                    ),
+                    ButtonSegment(
+                      value: BoxLocation.external,
+                      label: Text('خارجي'),
+                      icon: Icon(Icons.logout_rounded),
+                    ),
+                  ],
+                  selected: {_location},
+                  onSelectionChanged: (selection) {
+                    setState(() => _location = selection.first);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'ملاحظة (اختياري)',
+                    prefixIcon: Icon(Icons.notes_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.send_rounded),
+          label: const Text('إرسال للموافقة'),
+        ),
+      ],
     );
   }
 }
